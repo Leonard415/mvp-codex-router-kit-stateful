@@ -1,0 +1,7 @@
+interface:
+  display_name: "MVP Quality Router"
+  short_description: "Routes MVP work through Think → Plan → Build → Review → Test → Ship → Reflect."
+  default_prompt: "Use the MVP Quality Router. Pick the correct phase, choose one primary skill style, and do not code until the phase allows it."
+
+policy:
+  allow_implicit_invocation: true

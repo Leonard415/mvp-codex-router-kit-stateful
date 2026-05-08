@@ -1,0 +1,10 @@
+# Example Codex MCP configuration.
+# Usually lives at ~/.codex/config.toml
+# Replace the path with the real absolute path on your machine.
+
+[mcp_servers.mvp-router]
+command = "node"
+args = ["/ABSOLUTE/PATH/TO/mvp-codex-router-kit/mcp/mvp-router/dist/index.js"]
+startup_timeout_sec = 20
+tool_timeout_sec = 45
+enabled = true

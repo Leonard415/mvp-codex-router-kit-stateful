@@ -1,0 +1,4 @@
+This kit contains original router code and templates generated for the user.
+It references GSD, gstack, and Superpowers as workflow styles/specialist skills,
+but it does not copy their full repositories or bundled skill instructions.
+Install those projects separately if you want their full skill sets.
