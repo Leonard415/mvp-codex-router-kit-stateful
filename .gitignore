@@ -11,9 +11,6 @@ mcp/mvp-router/dist/
 *.log
 npm-debug.log*
 
-# Generated project tracker state
-.mvp-router/
-
 # OS/editor noise
 .DS_Store
 Thumbs.db

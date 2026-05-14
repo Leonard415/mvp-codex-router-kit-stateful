@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "0.2.0",
+  "projectId": "mvp-codex-router-kit",
+  "projectName": "MVP Codex Router Kit",
+  "projectType": "generic",
+  "projectDescription": "Stateful MCP router and workflow docs for Codex MVP project tracking.",
+  "repoSize": "small",
+  "riskLevel": "medium",
+  "createdAt": "2026-05-14T21:57:14.723Z",
+  "updatedAt": "2026-05-14T21:58:52Z",
+  "currentPhase": "think",
+  "currentSliceId": "define-narrow-mvp",
+  "phases": {
+    "think": {
+      "status": "in_progress",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    },
+    "plan": {
+      "status": "not_started",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    },
+    "build": {
+      "status": "not_started",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    },
+    "review": {
+      "status": "not_started",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    },
+    "test": {
+      "status": "not_started",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    },
+    "debug": {
+      "status": "not_started",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    "ship": {
+      "status": "not_started",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    },
+    "reflect": {
+      "status": "in_progress",
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:51.995Z"
+    }
+  },
+  "slices": [
+    {
+      "id": "define-narrow-mvp",
+      "title": "Define narrow MVP",
+      "phase": "think",
+      "status": "in_progress",
+      "estimatedHoursMin": 1,
+      "estimatedHoursMax": 3,
+      "acceptanceCriteria": [
+        "User, core workflow, non-goals, and success criteria are written"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "plan-architecture-and-vertical-slices",
+      "title": "Plan architecture and vertical slices",
+      "phase": "plan",
+      "status": "not_started",
+      "estimatedHoursMin": 2,
+      "estimatedHoursMax": 5,
+      "acceptanceCriteria": [
+        "Architecture, test plan, and implementation plan exist"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "build-app-shell",
+      "title": "Build app shell",
+      "phase": "build",
+      "status": "not_started",
+      "estimatedHoursMin": 3,
+      "estimatedHoursMax": 6,
+      "acceptanceCriteria": [
+        "App runs locally",
+        "Basic shell is working"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "build-core-user-flow",
+      "title": "Build core user flow",
+      "phase": "build",
+      "status": "not_started",
+      "estimatedHoursMin": 6,
+      "estimatedHoursMax": 14,
+      "acceptanceCriteria": [
+        "Core workflow works end to end"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "build-persistence-logging",
+      "title": "Build persistence/logging",
+      "phase": "build",
+      "status": "not_started",
+      "estimatedHoursMin": 3,
+      "estimatedHoursMax": 8,
+      "acceptanceCriteria": [
+        "Important data is saved or logged"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "review-mvp-for-bugs-and-scope-creep",
+      "title": "Review MVP for bugs and scope creep",
+      "phase": "review",
+      "status": "not_started",
+      "estimatedHoursMin": 2,
+      "estimatedHoursMax": 5,
+      "acceptanceCriteria": [
+        "Critical bugs and unnecessary features are identified"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "run-qa-and-verification",
+      "title": "Run QA and verification",
+      "phase": "test",
+      "status": "not_started",
+      "estimatedHoursMin": 3,
+      "estimatedHoursMax": 7,
+      "acceptanceCriteria": [
+        "Tests/build pass or failures are documented"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "prepare-mvp-handoff",
+      "title": "Prepare MVP handoff",
+      "phase": "ship",
+      "status": "not_started",
+      "estimatedHoursMin": 1,
+      "estimatedHoursMax": 3,
+      "acceptanceCriteria": [
+        "Git status and commit plan are clear"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "reflect-and-save-resume-state",
+      "title": "Reflect and save resume state",
+      "phase": "reflect",
+      "status": "not_started",
+      "estimatedHoursMin": 1,
+      "estimatedHoursMax": 2,
+      "acceptanceCriteria": [
+        "HANDOFF.md and PROJECT_STATUS.md are up to date"
+      ],
+      "blockers": [],
+      "notes": "",
+      "updatedAt": "2026-05-14T21:57:14.723Z"
+    },
+    {
+      "id": "mcp-router-health-check-and-tracker-safety-fixes",
+      "title": "MCP router health check and tracker safety fixes",
+      "phase": "reflect",
+      "status": "done",
+      "estimatedHoursMin": 2,
+      "estimatedHoursMax": 6,
+      "acceptanceCriteria": [],
+      "blockers": [],
+      "notes": "Human docs added for current state, TODO, and decisions. Tracker and project dashboard are present for future sessions. .gitignore no longer hides .mvp-router state.",
+      "updatedAt": "2026-05-14T21:58:52Z"
+    }
+  ],
+  "risks": [
+    "Keep MVP scope narrow.",
+    "Prefer boring, reliable code.",
+    "Do not add major dependencies or paid services without approval.",
+    "Running Codex MCP process may need restart/reinstall before patched source behavior is active in the live tool list.",
+    "Quant-Agent has manual docs but no .mvp-router/project-state.json; do not initialize it with the old server because it would overwrite docs/PROJECT_STATUS.md."
+  ],
+  "nextActions": [
+    "Restart or reinstall the MCP router so patched init safety is active.",
+    "Run a post-restart MCP smoke test for existing PROJECT_STATUS protection.",
+    "Then initialize Quant-Agent tracker with a preserve-first migration."
+  ],
+  "completedCommands": [
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "mcp:init_project_tracker",
+    "mcp:update_project_progress",
+    "apply_patch docs/CURRENT_STATE.md docs/TODO.md docs/DECISIONS.md",
+    "apply_patch .gitignore"
+  ],
+  "hours": {
+    "totalEstimatedMin": 24,
+    "totalEstimatedMax": 59,
+    "completedEstimated": 4.7,
+    "remainingEstimatedMin": 22,
+    "remainingEstimatedMax": 53,
+    "progressPercent": 11
+  },
+  "lastHandoff": "Router health check completed. Source patches and regression tests are in place. Restart or reinstall the MCP router before using tracker initialization on Quant-Agent, because the live MCP process may still be the old code."
+}

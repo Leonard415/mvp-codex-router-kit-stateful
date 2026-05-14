@@ -4,6 +4,7 @@ import { z } from "zod";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 
 type Phase = "think" | "plan" | "build" | "review" | "test" | "debug" | "ship" | "reflect";
 type ProjectType = "yoga_studio" | "it_help_app" | "generic" | "custom";
@@ -80,7 +81,6 @@ type ProjectState = {
   };
 };
 
-const PHASES: Phase[] = ["think", "plan", "build", "review", "test", "ship", "reflect"];
 const PHASES_WITH_DEBUG: Phase[] = ["think", "plan", "build", "review", "test", "debug", "ship", "reflect"];
 
 const REQUIRED_DOCS = [
@@ -473,21 +473,37 @@ function initialPhases(): ProjectState["phases"] {
   return phases;
 }
 
-function recomputeState(state: ProjectState): ProjectState {
-  const phases = initialPhases();
+export function recomputeState(state: ProjectState): ProjectState {
+  const timestamp = now();
+  const phases = {} as ProjectState["phases"];
   for (const phase of PHASES_WITH_DEBUG) {
+    const existing = state.phases[phase] || { status: "not_started", notes: "", updatedAt: timestamp };
     const phaseSlices = state.slices.filter((s) => s.phase === phase);
+    let status: PhaseStatus;
+
     if (phaseSlices.length === 0) {
-      phases[phase] = { ...(state.phases[phase] || phases[phase]), status: state.phases[phase]?.status || "not_started" };
+      status = existing.status || "not_started";
+      phases[phase] = {
+        status,
+        notes: existing.notes || "",
+        updatedAt: existing.updatedAt || timestamp,
+      };
       continue;
     }
-    if (phaseSlices.every((s) => s.status === "done")) phases[phase].status = "done";
-    else if (phaseSlices.some((s) => s.status === "blocked")) phases[phase].status = "blocked";
-    else if (phaseSlices.some((s) => s.status === "in_progress" || s.status === "done")) phases[phase].status = "in_progress";
-    else phases[phase].status = "not_started";
+
+    if (phaseSlices.every((s) => s.status === "done")) status = "done";
+    else if (phaseSlices.some((s) => s.status === "blocked")) status = "blocked";
+    else if (phaseSlices.some((s) => s.status === "in_progress" || s.status === "done")) status = "in_progress";
+    else status = "not_started";
+
+    phases[phase] = {
+      status,
+      notes: existing.notes || "",
+      updatedAt: existing.status === status && existing.updatedAt ? existing.updatedAt : timestamp,
+    };
   }
 
-  state.phases = { ...state.phases, ...phases };
+  state.phases = phases;
 
   const totalMin = state.slices.reduce((sum, s) => sum + s.estimatedHoursMin, 0);
   const totalMax = state.slices.reduce((sum, s) => sum + s.estimatedHoursMax, 0);
@@ -530,14 +546,47 @@ function recomputeState(state: ProjectState): ProjectState {
   return state;
 }
 
-async function readProjectState(repoPath?: string): Promise<ProjectState | null> {
+type ProjectStateLoadError = {
+  kind: "missing" | "invalid";
+  file: string;
+  message: string;
+};
+
+export type ProjectStateLoadResult = {
+  state: ProjectState | null;
+  error?: ProjectStateLoadError;
+};
+
+export async function loadProjectState(repoPath?: string): Promise<ProjectStateLoadResult> {
   const { stateFile } = trackerPaths(repoPath);
   try {
     const raw = await fs.readFile(stateFile, "utf8");
-    return recomputeState(JSON.parse(raw) as ProjectState);
-  } catch {
-    return null;
+    return { state: recomputeState(JSON.parse(raw) as ProjectState) };
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") {
+      return {
+        state: null,
+        error: {
+          kind: "missing",
+          file: stateFile,
+          message: "No tracker found. Run init_project_tracker first.",
+        },
+      };
+    }
+    return {
+      state: null,
+      error: {
+        kind: "invalid",
+        file: stateFile,
+        message: `Tracker exists but could not be read: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    };
   }
+}
+
+async function readProjectState(repoPath?: string): Promise<ProjectState | null> {
+  return (await loadProjectState(repoPath)).state;
 }
 
 async function writeProjectState(repoPath: string | undefined, state: ProjectState, writeDashboard: boolean = true): Promise<void> {
@@ -549,7 +598,7 @@ async function writeProjectState(repoPath: string | undefined, state: ProjectSta
   if (writeDashboard) await fs.writeFile(paths.statusFile, renderDashboard(next), "utf8");
 }
 
-function createInitialState(input: {
+export function createInitialState(input: {
   projectName: string;
   projectType: ProjectType;
   projectDescription?: string;
@@ -604,6 +653,93 @@ function createInitialState(input: {
   return recomputeState(state);
 }
 
+type InitProjectTrackerInput = {
+  repoPath: string;
+  projectName: string;
+  projectType: ProjectType;
+  projectDescription: string;
+  repoSize: RepoSize;
+  riskLevel: RiskLevel;
+  overwrite: boolean;
+};
+
+type InitProjectTrackerResult = {
+  created?: boolean;
+  alreadyExists?: boolean;
+  conflict?: boolean;
+  invalid?: boolean;
+  message?: string;
+  state?: ProjectState;
+  dashboard?: string;
+  files?: string[];
+  backupFiles?: string[];
+};
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function backupPath(filePath: string): string {
+  const parsed = path.parse(filePath);
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  return path.join(parsed.dir, `${parsed.name}.backup-${stamp}${parsed.ext}`);
+}
+
+async function backupIfExists(filePath: string): Promise<string | undefined> {
+  if (!(await pathExists(filePath))) return undefined;
+  const target = backupPath(filePath);
+  await fs.copyFile(filePath, target);
+  return target;
+}
+
+export async function initProjectTracker(data: InitProjectTrackerInput): Promise<InitProjectTrackerResult> {
+  const paths = trackerPaths(data.repoPath);
+  const existing = await loadProjectState(data.repoPath);
+
+  if (existing.state && !data.overwrite) {
+    const dashboard = renderDashboard(existing.state);
+    return { alreadyExists: true, state: existing.state, dashboard };
+  }
+
+  if (existing.error?.kind === "invalid" && !data.overwrite) {
+    return {
+      created: false,
+      invalid: true,
+      message: `${existing.error.message} Pass overwrite=true only after backing up or repairing ${path.relative(paths.root, existing.error.file)}.`,
+    };
+  }
+
+  const statusExists = await pathExists(paths.statusFile);
+  if (!existing.state && statusExists && !data.overwrite) {
+    return {
+      created: false,
+      conflict: true,
+      message: "docs/PROJECT_STATUS.md already exists but .mvp-router/project-state.json is missing. Refusing to overwrite human project status without overwrite=true.",
+      files: ["docs/PROJECT_STATUS.md"],
+    };
+  }
+
+  const backupFiles = data.overwrite
+    ? (await Promise.all([backupIfExists(paths.stateFile), backupIfExists(paths.statusFile)])).filter((file): file is string => Boolean(file))
+    : [];
+  const state = createInitialState(data);
+  await writeProjectState(data.repoPath, state, true);
+  const dashboard = renderDashboard(state);
+
+  return {
+    created: true,
+    state,
+    dashboard,
+    files: [".mvp-router/project-state.json", "docs/PROJECT_STATUS.md"],
+    backupFiles: backupFiles.map((file) => path.relative(paths.root, file)),
+  };
+}
+
 function statusIcon(status: PhaseStatus | SliceStatus): string {
   switch (status) {
     case "done": return "✅";
@@ -632,17 +768,18 @@ function renderMermaid(state: ProjectState): string {
     const icon = statusIcon(p?.status || "not_started");
     return `${phase}["${icon} ${titleCasePhase(phase)}"]`;
   };
+  const workflow = PHASES_WITH_DEBUG.map(node).join(" --> ");
   return [
     "```mermaid",
     "flowchart LR",
-    `  ${node("think")} --> ${node("plan")} --> ${node("build")} --> ${node("review")} --> ${node("test")} --> ${node("ship")} --> ${node("reflect")}`,
+    `  ${workflow}`,
     "```",
   ].join("\n");
 }
 
-function renderDashboard(state: ProjectState): string {
+export function renderDashboard(state: ProjectState): string {
   const currentSlice = state.slices.find((s) => s.id === state.currentSliceId);
-  const phaseRows = PHASES.map((phase) => {
+  const phaseRows = PHASES_WITH_DEBUG.map((phase) => {
     const p = state.phases[phase];
     return `| ${statusIcon(p.status)} ${titleCasePhase(phase)} | ${p.status.replace(/_/g, " ")} | ${p.notes || ""} |`;
   }).join("\n");
@@ -782,16 +919,8 @@ server.registerTool(
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   async (input) => {
-    const data = input as { repoPath: string; projectName: string; projectType: ProjectType; projectDescription: string; repoSize: RepoSize; riskLevel: RiskLevel; overwrite: boolean };
-    const existing = await readProjectState(data.repoPath);
-    if (existing && !data.overwrite) {
-      const dashboard = renderDashboard(existing);
-      return { structuredContent: { alreadyExists: true, state: existing, dashboard }, content: [{ type: "text", text: dashboard }] };
-    }
-    const state = createInitialState(data);
-    await writeProjectState(data.repoPath, state, true);
-    const dashboard = renderDashboard(state);
-    return { structuredContent: { created: true, state, dashboard, files: [".mvp-router/project-state.json", "docs/PROJECT_STATUS.md"] }, content: [{ type: "text", text: dashboard }] };
+    const result = await initProjectTracker(input as InitProjectTrackerInput);
+    return { structuredContent: result, content: [{ type: "text", text: result.dashboard || result.message || JSON.stringify(result, null, 2) }] };
   }
 );
 
@@ -805,9 +934,12 @@ server.registerTool(
   },
   async (input) => {
     const data = input as { repoPath: string; writeDashboard: boolean };
-    const state = await readProjectState(data.repoPath);
+    const loaded = await loadProjectState(data.repoPath);
+    const state = loaded.state;
     if (!state) {
-      const message = "No tracker found. Run init_project_tracker first to create .mvp-router/project-state.json and docs/PROJECT_STATUS.md.";
+      const message = loaded.error?.kind === "invalid"
+        ? loaded.error.message
+        : "No tracker found. Run init_project_tracker first to create .mvp-router/project-state.json and docs/PROJECT_STATUS.md.";
       return { structuredContent: { found: false, message }, content: [{ type: "text", text: message }] };
     }
     if (data.writeDashboard) await writeProjectState(data.repoPath, state, true);
@@ -842,9 +974,10 @@ server.registerTool(
     const data = input as {
       repoPath: string; currentPhase?: Phase; currentSliceId?: string; sliceTitle?: string; slicePhase?: Phase; sliceStatus?: SliceStatus; sliceNotes?: string; actualHours?: number; blockers: string[]; completedCommands: string[]; risks: string[]; nextActions: string[]; writeDashboard: boolean;
     };
-    const state = await readProjectState(data.repoPath);
+    const loaded = await loadProjectState(data.repoPath);
+    const state = loaded.state;
     if (!state) {
-      const message = "No tracker found. Run init_project_tracker first.";
+      const message = loaded.error?.kind === "invalid" ? loaded.error.message : "No tracker found. Run init_project_tracker first.";
       return { structuredContent: { updated: false, message }, content: [{ type: "text", text: message }] };
     }
 
@@ -903,9 +1036,10 @@ server.registerTool(
   },
   async (input) => {
     const data = input as { repoPath: string; handoffNotes: string; nextActions: string[] };
-    const state = await readProjectState(data.repoPath);
+    const loaded = await loadProjectState(data.repoPath);
+    const state = loaded.state;
     if (!state) {
-      const message = "No tracker found. Run init_project_tracker first.";
+      const message = loaded.error?.kind === "invalid" ? loaded.error.message : "No tracker found. Run init_project_tracker first.";
       return { structuredContent: { paused: false, message }, content: [{ type: "text", text: message }] };
     }
     if (data.nextActions.length) state.nextActions = data.nextActions;
@@ -980,5 +1114,11 @@ server.registerTool(
   }
 );
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+export async function startServer(): Promise<void> {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await startServer();
+}

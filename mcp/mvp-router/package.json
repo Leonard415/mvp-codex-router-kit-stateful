@@ -6,6 +6,7 @@
   "description": "Stateful MCP router for high-accuracy MVP development workflows.",
   "scripts": {
     "start": "tsx src/index.ts",
+    "test": "node --test --import tsx test/*.test.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
