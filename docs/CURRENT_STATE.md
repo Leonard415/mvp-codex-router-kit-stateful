@@ -19,7 +19,10 @@ Last updated: 2026-05-14
 
 ## Current Limitation
 
-- The running Codex MCP process may still be using the old loaded server code. Restart or reinstall the MCP router before relying on the patched `init_project_tracker` behavior in another repo.
+- Commit `1a2b690` was pushed to `origin/main` on 2026-05-14.
+- The MCP registration was removed and re-added to point at `/root/mvp-codex-router-kit-stateful/mcp/mvp-router/dist/index.js`.
+- The rebuilt bundle has the patched behavior when imported directly: `initProjectTracker()` refuses to overwrite an existing `docs/PROJECT_STATUS.md` without `overwrite=true`.
+- The stale in-session MCP process was terminated, but this Codex session did not reconnect the `mvp-router` tool; subsequent tool calls returned `Transport closed`. A new Codex session should start the server from the refreshed config.
 - `/root/Quant-Agent` has detailed manual docs but no `.mvp-router/project-state.json`. Do not initialize it with the old server because its current `docs/PROJECT_STATUS.md` should be preserved.
 
 ## Changed Files
@@ -33,9 +36,12 @@ Last updated: 2026-05-14
 - `docs/CURRENT_STATE.md`
 - `docs/TODO.md`
 - `docs/DECISIONS.md`
+- `docs/HANDOFF.md`
 
 ## Verification
 
 - `npm test`
 - `npm run typecheck`
 - `npm run build`
+- `git push origin main`
+- Direct Node import of `dist/index.js` confirmed existing-status protection returns `conflict: true`.

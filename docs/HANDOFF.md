@@ -82,3 +82,5 @@ Call mvp-router get_project_status first, then continue only with the next safes
 ## Handoff Notes
 
 Router health check completed. Source patches and regression tests are in place. Restart or reinstall the MCP router before using tracker initialization on Quant-Agent, because the live MCP process may still be the old code.
+
+2026-05-14 update: commit `1a2b690` was pushed to `origin/main`. The MCP registration was removed and re-added, then the stale `node .../dist/index.js` process was terminated. This Codex session did not reconnect the MCP transport afterward (`Transport closed`), so use a fresh Codex session to verify the live MCP tool behavior before initializing `Quant-Agent`.
