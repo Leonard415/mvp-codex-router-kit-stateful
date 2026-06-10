@@ -179,17 +179,35 @@ test("SKILL_MAP covers every phase with exactly one primary skill", () => {
   }
 });
 
-test("getSkillRecommendations filters by installed families", () => {
-  const all = getSkillRecommendations("build", { gsd: true, gstack: true, superpowers: true });
+const ALL_FAMILIES = { gsd: true, gstack: true, superpowers: true };
+const allMappedSkills = () => new Set(Object.values(SKILL_MAP).flat().map((r) => r.skill));
+
+test("getSkillRecommendations filters per installed skill", () => {
+  const all = getSkillRecommendations("build", { families: ALL_FAMILIES, installedSkills: allMappedSkills() });
   assert.ok(all.available.some((r) => r.family === "superpowers"));
-  assert.equal(all.missingFamilies.length, 0);
+  assert.equal(all.missingSkills.length, 0);
 
-  const noSp = getSkillRecommendations("build", { gsd: true, gstack: true, superpowers: false });
+  const noSp = getSkillRecommendations("build", {
+    families: { ...ALL_FAMILIES, superpowers: false },
+    installedSkills: new Set([...allMappedSkills()].filter((s) => !s.startsWith("superpowers:"))),
+  });
   assert.ok(noSp.available.every((r) => r.family !== "superpowers"));
-  assert.ok(noSp.missingFamilies.includes("superpowers"));
+  assert.ok(noSp.missingSkills.includes("superpowers:test-driven-development"));
 
-  const none = getSkillRecommendations("build", { gsd: false, gstack: false, superpowers: false });
+  const none = getSkillRecommendations("build", { families: { gsd: false, gstack: false, superpowers: false }, installedSkills: new Set() });
   assert.equal(none.available.length, 0);
+});
+
+test("getSkillRecommendations skips individually removed skills (GSD surface slimming)", () => {
+  const slimmed = new Set([...allMappedSkills()].filter((s) => s !== "gsd-debug" && s !== "gsd-ship"));
+  const debug = getSkillRecommendations("debug", { families: ALL_FAMILIES, installedSkills: slimmed });
+  assert.ok(debug.available.every((r) => r.skill !== "gsd-debug"));
+  assert.ok(debug.missingSkills.includes("gsd-debug"));
+  assert.ok(debug.available.some((r) => r.skill === "superpowers:systematic-debugging"), "primary survives");
+
+  const ship = getSkillRecommendations("ship", { families: ALL_FAMILIES, installedSkills: slimmed });
+  assert.ok(ship.missingSkills.includes("gsd-ship"));
+  assert.ok(ship.available.some((r) => r.skill === "gstack-ship"), "primary survives");
 });
 
 test("detectGsdPlanning detects .planning directory", async () => {

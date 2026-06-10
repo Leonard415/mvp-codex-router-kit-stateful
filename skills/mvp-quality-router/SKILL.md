@@ -28,6 +28,16 @@ You are conducting an orchestra of specialist skills. The mvp-router MCP server 
 - If the router blocks a phase advance, fix the gate conditions before retrying.
 - The repo remembers the project; the chat does not. Keep the tracker and docs current.
 
+## Precedence and overlap
+
+Several routing systems can fire on the same task. The order is:
+
+1. **This conductor routes at the project level** — which phase, which specialist skill. Once it has routed, other meta-routers (superpowers' skill-check rule, CLAUDE.md routing tables) are satisfied; do not re-route mid-phase.
+2. **Inside a phase, the invoked specialist skill's own process governs** — superpowers TDD's red/green/refactor, gsd-plan-phase's planning loop, gstack-qa's test cycle. The conductor resumes when that skill completes.
+3. **State owner is exclusive:** if `.planning/` exists, GSD owns project state — use GSD status/phase commands and skip `init_project`. Otherwise `.mvp-router/` owns it. Never run both trackers in one repo.
+
+A recommended skill may be missing on slimmed installs (GSD surface profiles); the router already skips it — pick the next available role rather than hunting for the missing one.
+
 ## Fallback (MCP server unavailable)
 
 If mvp-router tools are not available, route by hand with this table and tell the user the server is down:

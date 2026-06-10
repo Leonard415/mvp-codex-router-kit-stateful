@@ -279,16 +279,39 @@ export async function detectInstalledFamilies(): Promise<InstalledFamilies> {
   return { gsd, gstack, superpowers };
 }
 
-export function getSkillRecommendations(phase: Phase, installed: InstalledFamilies): { available: SkillRef[]; missingFamilies: SkillFamily[] } {
-  const refs = SKILL_MAP[phase] || [];
-  const available = refs.filter((r) => installed[r.family]);
-  const missingFamilies = (Object.keys(installed) as SkillFamily[]).filter(
-    (f) => !installed[f] && refs.some((r) => r.family === f)
+export type SkillAvailability = { families: InstalledFamilies; installedSkills: Set<string> };
+
+// Per-skill detection: GSD's surface profiles and gstack updates can remove
+// individual skill dirs while the family stays installed, so family-level
+// checks alone would recommend skills that no longer exist.
+export async function detectSkillAvailability(): Promise<SkillAvailability> {
+  const families = await detectInstalledFamilies();
+  const skillsDir = path.join(os.homedir(), ".claude", "skills");
+  const unique = new Set<string>();
+  for (const refs of Object.values(SKILL_MAP)) for (const r of refs) unique.add(r.skill);
+
+  const installedSkills = new Set<string>();
+  await Promise.all(
+    [...unique].map(async (name) => {
+      if (name.includes(":")) {
+        const family = name.split(":")[0] as SkillFamily;
+        if (families[family]) installedSkills.add(name);
+      } else if (await fileExists(path.join(skillsDir, name, "SKILL.md"))) {
+        installedSkills.add(name);
+      }
+    })
   );
-  return { available, missingFamilies };
+  return { families, installedSkills };
 }
 
-function formatSkillSection(phase: Phase, recs: { available: SkillRef[]; missingFamilies: SkillFamily[] }): string[] {
+export function getSkillRecommendations(phase: Phase, availability: SkillAvailability): { available: SkillRef[]; missingSkills: string[] } {
+  const refs = SKILL_MAP[phase] || [];
+  const available = refs.filter((r) => availability.installedSkills.has(r.skill));
+  const missingSkills = refs.filter((r) => !availability.installedSkills.has(r.skill)).map((r) => r.skill);
+  return { available, missingSkills };
+}
+
+function formatSkillSection(phase: Phase, recs: { available: SkillRef[]; missingSkills: string[] }): string[] {
   if (recs.available.length === 0) {
     return ["", "Recommended skills: none installed for this phase — follow the instructions above directly."];
   }
@@ -297,8 +320,8 @@ function formatSkillSection(phase: Phase, recs: { available: SkillRef[]; missing
     "Recommended skills (invoke with the Skill tool — one PRIMARY per phase, plus one REVIEWER after the work is done):",
     ...recs.available.map((r) => `- [${r.role.toUpperCase()}] ${r.skill} — ${r.when}`),
   ];
-  if (recs.missingFamilies.length) {
-    lines.push(`(Not installed, picks skipped: ${recs.missingFamilies.join(", ")})`);
+  if (recs.missingSkills.length) {
+    lines.push(`(Not installed, skipped: ${recs.missingSkills.join(", ")})`);
   }
   return lines;
 }
@@ -891,7 +914,7 @@ type WorkflowOutput = {
   promptSummary: string;
   trackerNote?: string;
   recommendedSkills: SkillRef[];
-  missingSkillFamilies: SkillFamily[];
+  missingSkills: string[];
   externalState?: { system: "gsd"; note: string };
 };
 
@@ -950,10 +973,10 @@ async function routeWorkflow(input: {
   }
 
   const runtime: Runtime = input.runtime || "claude";
-  const installed = runtime === "claude"
-    ? await detectInstalledFamilies()
-    : { gsd: false, gstack: false, superpowers: false };
-  const recs = getSkillRecommendations(phase, installed);
+  const availability: SkillAvailability = runtime === "claude"
+    ? await detectSkillAvailability()
+    : { families: { gsd: false, gstack: false, superpowers: false }, installedSkills: new Set<string>() };
+  const recs = getSkillRecommendations(phase, availability);
 
   let externalState: WorkflowOutput["externalState"];
   if (await detectGsdPlanning(repoPath)) {
@@ -989,7 +1012,7 @@ async function routeWorkflow(input: {
     promptSummary: promptLines.join("\n"),
     trackerNote,
     recommendedSkills: recs.available,
-    missingSkillFamilies: recs.missingFamilies,
+    missingSkills: recs.missingSkills,
     externalState,
   };
 }
@@ -1082,7 +1105,7 @@ function estimateHours(input: {
 // MCP Server registration
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({ name: "mvp-router", version: "0.4.0" });
+const server = new McpServer({ name: "mvp-router", version: "0.4.1" });
 
 // --- choose_workflow ---
 server.registerTool(
@@ -1117,24 +1140,25 @@ server.registerTool(
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   async () => {
-    const installed = await detectInstalledFamilies();
+    const availability = await detectSkillAvailability();
+    const { families } = availability;
     const lines: string[] = [
-      `Installed skill families: gsd=${installed.gsd} gstack=${installed.gstack} superpowers=${installed.superpowers}`,
+      `Installed skill families: gsd=${families.gsd} gstack=${families.gstack} superpowers=${families.superpowers}`,
       "",
     ];
     for (const phase of ALL_PHASES) {
-      const recs = getSkillRecommendations(phase, installed);
+      const recs = getSkillRecommendations(phase, availability);
       lines.push(`${titleCase(phase)}:`);
       const refs = SKILL_MAP[phase] || [];
       for (const r of refs) {
-        const mark = installed[r.family] ? "" : " [NOT INSTALLED]";
+        const mark = availability.installedSkills.has(r.skill) ? "" : " [NOT INSTALLED]";
         lines.push(`- [${r.role.toUpperCase()}] ${r.skill}${mark} — ${r.when}`);
       }
       if (recs.available.length === 0) lines.push("- (no installed skills — use self-contained phase instructions)");
       lines.push("");
     }
     return {
-      structuredContent: { installed, skillMap: SKILL_MAP },
+      structuredContent: { installed: families, installedSkills: [...availability.installedSkills].sort(), skillMap: SKILL_MAP },
       content: [{ type: "text", text: lines.join("\n") }],
     };
   }
@@ -1219,8 +1243,8 @@ server.registerTool(
       return { structuredContent: { found: false, message: msg, externalState: hasGsd ? "gsd" : undefined }, content: [{ type: "text", text: msg }] };
     }
     await writeProjectState(data.repoPath, loaded.state, true);
-    const installed = await detectInstalledFamilies();
-    const recs = getSkillRecommendations(loaded.state.currentPhase, installed);
+    const availability = await detectSkillAvailability();
+    const recs = getSkillRecommendations(loaded.state.currentPhase, availability);
     const extras = [
       ...formatSkillSection(loaded.state.currentPhase, recs),
       ...(hasGsd ? ["", gsdCoexistenceNote(true)] : []),
@@ -1299,8 +1323,8 @@ server.registerTool(
     const dashboard = renderDashboard(updated);
 
     const nextDefFull = getPhaseDefinition(next, updated.riskLevel);
-    const installed = await detectInstalledFamilies();
-    const recs = getSkillRecommendations(next, installed);
+    const availability = await detectSkillAvailability();
+    const recs = getSkillRecommendations(next, availability);
     const summary = [
       `Advanced: ${current} -> ${next}${forceNote}`,
       "",
@@ -1612,8 +1636,8 @@ server.registerTool(
   async (input) => {
     const data = input as { phase: Phase; riskLevel: RiskLevel };
     const def = getPhaseDefinition(data.phase, data.riskLevel);
-    const installed = await detectInstalledFamilies();
-    const recs = getSkillRecommendations(data.phase, installed);
+    const availability = await detectSkillAvailability();
+    const recs = getSkillRecommendations(data.phase, availability);
 
     const summary = [
       `Phase: ${titleCase(data.phase)} | Coding allowed: ${def.codingAllowed ? "yes" : "no"}`,
